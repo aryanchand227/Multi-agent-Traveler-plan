@@ -8,6 +8,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.travel_run import TravelRequest, TravelRun
+from app.core.serialization import to_json_safe
 
 
 class TravelRepository:
@@ -79,12 +80,15 @@ class TravelRepository:
         status: str,
         error: str | None = None,
         final_plan: dict | None = None,
+        agent_states: dict | None = None,
     ) -> None:
         values: dict[str, Any] = {"status": status}
         if error is not None:
             values["error"] = error
         if final_plan is not None:
-            values["final_plan"] = final_plan
+            values["final_plan"] = to_json_safe(final_plan)
+        if agent_states is not None:
+            values["agent_states"] = to_json_safe(agent_states)
         if status in ("completed", "failed", "cancelled"):
             values["completed_at"] = datetime.datetime.now(datetime.timezone.utc)
         await self.session.execute(

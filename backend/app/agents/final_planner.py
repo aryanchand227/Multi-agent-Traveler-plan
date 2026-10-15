@@ -7,6 +7,7 @@ from typing import Any
 from app.agents.base import BaseAgent
 from app.graph.state import TravelState
 from app.core.config import get_settings
+from app.core.serialization import to_json_safe
 
 
 class FinalPlannerAgent(BaseAgent):
@@ -121,7 +122,7 @@ class FinalPlannerAgent(BaseAgent):
             "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         }
 
-        return {"final_plan": final_plan}
+        return {"final_plan": to_json_safe(final_plan)}
 
     async def _generate_summary(self, state: TravelState, detail_level: str, max_tokens: int) -> str:
         """Generate a human-readable summary using the LLM."""

@@ -19,6 +19,7 @@ from app.db.session import get_session_factory
 from app.db.repositories.travel import TravelRepository
 from app.db.repositories.usage import UsageRepository
 from app.core.rate_limit import get_workflow_semaphore
+from app.core.serialization import to_json_safe
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +147,8 @@ class TravelPlanningService:
                 clarification_questions = None
 
             result["user_id"] = user_id
-            self._runs[request_id] = result
+            safe_final_plan = to_json_safe(result.get("final_plan")) if status_val == TravelRunStatus.COMPLETED else None
+            self._runs[request_id] = to_json_safe(result)
 
             # Update database
             async with session_factory() as session:
@@ -156,7 +158,7 @@ class TravelPlanningService:
                 await travel_repo.update_run_status(
                     run_id=run_id,
                     status=status_val.value,
-                    final_plan=result.get("final_plan") if status_val == TravelRunStatus.COMPLETED else None,
+                    final_plan=safe_final_plan,
                 )
 
                 # Record usage metrics
@@ -185,7 +187,7 @@ class TravelPlanningService:
                     {"field": q["field"], "question": q["question"], "required": True}
                     for q in (clarification_questions or [])
                 ] if clarification_questions else None,
-                final_plan=result.get("final_plan") if status_val == TravelRunStatus.COMPLETED else None,
+                final_plan=safe_final_plan,
             )
         except Exception as e:
             logger.error("Travel planning failed for %s: %s", request_id, e)
@@ -291,12 +293,25 @@ class TravelPlanningService:
                 result = await self._run_graph_with_events(request_id, new_state)
 
             result["user_id"] = user_id
-            self._runs[request_id] = result
-
             if result.get("requires_clarification"):
                 status_val = TravelRunStatus.CLARIFYING
             else:
                 status_val = TravelRunStatus.COMPLETED
+
+            safe_final_plan = to_json_safe(result.get("final_plan")) if status_val == TravelRunStatus.COMPLETED else None
+            self._runs[request_id] = to_json_safe(result)
+
+            # Persist status and final_plan to database if run exists
+            session_factory = get_session_factory()
+            async with session_factory() as session:
+                travel_repo = TravelRepository(session)
+                run = await travel_repo.get_run_by_request(request_id)
+                if run:
+                    await travel_repo.update_run_status(
+                        run_id=run.id,
+                        status=status_val.value,
+                        final_plan=safe_final_plan,
+                    )
 
             return TravelRunResponse(
                 request_id=request_id,
@@ -307,7 +322,7 @@ class TravelPlanningService:
                     {"field": q["field"], "question": q["question"], "required": True}
                     for q in result.get("clarification_questions", [])
                 ] if result.get("requires_clarification") else None,
-                final_plan=result.get("final_plan") if status_val == TravelRunStatus.COMPLETED else None,
+                final_plan=safe_final_plan,
             )
         except Exception as e:
             return TravelRunResponse(
@@ -399,11 +414,12 @@ class TravelPlanningService:
                 result = await self._run_graph_with_events(request_id, new_state)
 
             result["user_id"] = user_id
-            self._runs[request_id] = result
-
             status_val = TravelRunStatus.COMPLETED
             if result.get("requires_clarification"):
                 status_val = TravelRunStatus.CLARIFYING
+
+            safe_final_plan = to_json_safe(result.get("final_plan")) if status_val == TravelRunStatus.COMPLETED else None
+            self._runs[request_id] = to_json_safe(result)
 
             # Update DB run
             session_factory = get_session_factory()
@@ -414,7 +430,7 @@ class TravelPlanningService:
                     await travel_repo.update_run_status(
                         run_id=run.id,
                         status=status_val.value,
-                        final_plan=result.get("final_plan") if status_val == TravelRunStatus.COMPLETED else None,
+                        final_plan=safe_final_plan,
                     )
 
             return TravelRunResponse(
@@ -422,7 +438,7 @@ class TravelPlanningService:
                 run_id=request_id,
                 status=status_val,
                 completed_at=datetime.datetime.now(datetime.timezone.utc) if status_val == TravelRunStatus.COMPLETED else None,
-                final_plan=result.get("final_plan") if status_val == TravelRunStatus.COMPLETED else None,
+                final_plan=safe_final_plan,
             )
         except Exception as e:
             return TravelRunResponse(
@@ -457,7 +473,7 @@ class TravelPlanningService:
                 request_id=request_id,
                 run_id=request_id,
                 status=status_val,
-                final_plan=result.get("final_plan"),
+                final_plan=to_json_safe(result.get("final_plan")),
                 clarification_questions=[
                     {"field": q["field"], "question": q["question"], "required": True}
                     for q in result.get("clarification_questions", [])
