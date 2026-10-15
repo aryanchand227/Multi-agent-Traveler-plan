@@ -1,4 +1,5 @@
 from datetime import datetime
+import sqlalchemy as sa
 from sqlalchemy import String, Float, Boolean, JSON, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -20,5 +21,5 @@ class AccommodationOption(Base, TimestampMixin, UUIDMixin):
     source_type: Mapped[str] = mapped_column(String)
     availability: Mapped[str] = mapped_column(String, default="unknown")
     retrieved_at: Mapped[datetime] = mapped_column(DateTime)
-    is_selected: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_selected: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa.false())
     metadata_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)

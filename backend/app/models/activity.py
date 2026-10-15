@@ -1,3 +1,4 @@
+import sqlalchemy as sa
 from sqlalchemy import String, Integer, Float, Boolean, Text, JSON, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -14,7 +15,7 @@ class Activity(Base, TimestampMixin, UUIDMixin):
     estimated_duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     estimated_cost: Mapped[float | None] = mapped_column(Float, nullable=True)
     best_time: Mapped[str | None] = mapped_column(String, nullable=True)
-    weather_dependency: Mapped[bool] = mapped_column(Boolean, default=False)
+    weather_dependency: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa.false())
     source: Mapped[str] = mapped_column(String)
     source_type: Mapped[str] = mapped_column(String)
     metadata_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)

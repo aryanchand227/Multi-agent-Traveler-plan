@@ -161,3 +161,164 @@ def test_fresh_database_schema_all_13_tables_created():
                 os.remove(test_db_path)
             except Exception:
                 pass
+
+
+# --- 4. PostgreSQL & SQLite Boolean Defaults Compatibility Tests ---
+
+def test_fresh_postgresql_schema_boolean_defaults_portable():
+    """Verify that the initial schema migration generates valid PostgreSQL DDL with BOOLEAN DEFAULT true/false.
+
+    Ensures that integer defaults ('1', '0') are not generated for Boolean columns on PostgreSQL,
+    which would otherwise trigger PostgreSQL error:
+    'column ... is of type boolean but default expression is of type integer'
+    """
+    import io
+    import importlib.util
+    import sqlalchemy as sa
+    from sqlalchemy.dialects import postgresql
+    from alembic.operations import Operations
+    from alembic.runtime.migration import MigrationContext
+
+    output_buffer = io.StringIO()
+
+    def dump_sql(sql, *multiparams, **params):
+        str_sql = str(sql.compile(dialect=postgresql.dialect())) if hasattr(sql, "compile") else str(sql)
+        output_buffer.write(str_sql + ";\n")
+
+    mock_engine = sa.create_mock_engine("postgresql://", dump_sql)
+    ctx = MigrationContext.configure(mock_engine)
+
+    # Load initial schema migration
+    migration_path = os.path.join(
+        os.path.dirname(__file__), "..", "migrations", "versions", "134b62b01968_initial_schema.py"
+    )
+    spec = importlib.util.spec_from_file_location("initial_schema_migration", migration_path)
+    migration_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration_mod)
+
+    with Operations.context(ctx):
+        migration_mod.upgrade()
+
+    generated_sql = output_buffer.getvalue()
+
+    # Verify no integer defaults on Boolean columns
+    assert "BOOLEAN DEFAULT 1" not in generated_sql, "PostgreSQL schema must not contain BOOLEAN DEFAULT 1"
+    assert "BOOLEAN DEFAULT 0" not in generated_sql, "PostgreSQL schema must not contain BOOLEAN DEFAULT 0"
+    assert "BOOLEAN DEFAULT '1'" not in generated_sql, "PostgreSQL schema must not contain BOOLEAN DEFAULT '1'"
+    assert "BOOLEAN DEFAULT '0'" not in generated_sql, "PostgreSQL schema must not contain BOOLEAN DEFAULT '0'"
+
+    # Verify expected boolean defaults are present
+    assert "is_active BOOLEAN DEFAULT true" in generated_sql, "users.is_active must have DEFAULT true"
+    assert "is_selected BOOLEAN DEFAULT false" in generated_sql, "is_selected must have DEFAULT false"
+    assert "weather_dependency BOOLEAN DEFAULT false" in generated_sql, "activities.weather_dependency must have DEFAULT false"
+
+
+def test_models_ddl_compilation_boolean_defaults():
+    """Verify ORM models compile to correct Boolean expressions under both PostgreSQL and SQLite."""
+    import sqlalchemy as sa
+    from sqlalchemy.dialects import postgresql, sqlite
+    from sqlalchemy.schema import CreateTable
+    from app.models.user import User
+    from app.models.travel_option import TransportOption
+    from app.models.accommodation import AccommodationOption
+    from app.models.activity import Activity
+
+    models_and_columns = [
+        (User, "is_active", "DEFAULT true", "DEFAULT 1"),
+        (TransportOption, "is_selected", "DEFAULT false", "DEFAULT 0"),
+        (AccommodationOption, "is_selected", "DEFAULT false", "DEFAULT 0"),
+        (Activity, "weather_dependency", "DEFAULT false", "DEFAULT 0"),
+    ]
+
+    for model_cls, col_name, expected_pg, expected_sqlite in models_and_columns:
+        table = model_cls.__table__
+        pg_ddl = str(CreateTable(table).compile(dialect=postgresql.dialect()))
+        sqlite_ddl = str(CreateTable(table).compile(dialect=sqlite.dialect()))
+
+        # PostgreSQL assertions
+        assert expected_pg in pg_ddl, f"{model_cls.__name__}.{col_name} should have {expected_pg} in PostgreSQL DDL"
+        assert "DEFAULT 1" not in pg_ddl if expected_pg == "DEFAULT true" else True
+        assert "DEFAULT 0" not in pg_ddl if expected_pg == "DEFAULT false" else True
+
+        # SQLite assertions
+        assert expected_sqlite in sqlite_ddl, f"{model_cls.__name__}.{col_name} should have {expected_sqlite} in SQLite DDL"
+
+
+def test_fresh_sqlite_schema_boolean_defaults_applied():
+    """Verify that on SQLite, inserting rows without Boolean values respects default values."""
+    temp_dir = tempfile.gettempdir()
+    test_db_path = os.path.join(temp_dir, f"test_bool_defaults_{os.getpid()}.db")
+    if os.path.exists(test_db_path):
+        try:
+            os.remove(test_db_path)
+        except Exception:
+            pass
+
+    alembic_cfg = Config("alembic.ini")
+    alembic_cfg.set_main_option("sqlalchemy.url", f"sqlite:///{test_db_path}")
+
+    try:
+        command.upgrade(alembic_cfg, "head")
+
+        conn = sqlite3.connect(test_db_path)
+        cursor = conn.cursor()
+
+        # Insert user without is_active
+        cursor.execute(
+            "INSERT INTO users (id, email) VALUES (?, ?)",
+            ("user-test-bool-1", "booltest@example.com"),
+        )
+        cursor.execute("SELECT is_active FROM users WHERE id = ?", ("user-test-bool-1",))
+        is_active_val = cursor.fetchone()[0]
+        assert is_active_val == 1, f"Expected is_active default to be 1 in SQLite, got {is_active_val}"
+
+        # Insert travel_request & travel_run to satisfy FK
+        cursor.execute(
+            "INSERT INTO travel_requests (id, user_id, raw_request) VALUES (?, ?, ?)",
+            ("req-1", "user-test-bool-1", "Trip to Paris"),
+        )
+        cursor.execute(
+            "INSERT INTO travel_runs (id, request_id) VALUES (?, ?)",
+            ("run-1", "req-1"),
+        )
+
+        # Insert transport_option without is_selected
+        cursor.execute(
+            "INSERT INTO transport_options (id, run_id, mode, provider, provider_type, origin, destination, price_per_person, total_price, source, source_type, retrieved_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("opt-1", "run-1", "flight", "AirFrance", "commercial", "NYC", "CDG", 500.0, 500.0, "mock", "api", "2026-10-15 12:00:00"),
+        )
+        cursor.execute("SELECT is_selected FROM transport_options WHERE id = ?", ("opt-1",))
+        is_selected_val = cursor.fetchone()[0]
+        assert is_selected_val == 0, f"Expected is_selected default to be 0 in SQLite, got {is_selected_val}"
+
+        conn.close()
+    finally:
+        if os.path.exists(test_db_path):
+            try:
+                os.remove(test_db_path)
+            except Exception:
+                pass
+
+
+def test_real_postgresql_integration_if_configured():
+    """Run real migration and schema check if a live PostgreSQL database is supplied via environment variable."""
+    pg_url = os.getenv("TEST_POSTGRESQL_URL")
+    if not pg_url:
+        pytest.skip("TEST_POSTGRESQL_URL not set; skipping live PostgreSQL integration test")
+
+    import sqlalchemy as sa
+    from alembic import command
+    from alembic.config import Config
+
+    alembic_cfg = Config("alembic.ini")
+    alembic_cfg.set_main_option("sqlalchemy.url", pg_url)
+    command.upgrade(alembic_cfg, "head")
+
+    engine = sa.create_engine(pg_url)
+    with engine.connect() as conn:
+        result = conn.execute(sa.text("SELECT column_name, data_type, column_default FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'is_active'"))
+        row = result.fetchone()
+        assert row is not None
+        assert row[1] == "boolean"
+        assert "true" in str(row[2]).lower()

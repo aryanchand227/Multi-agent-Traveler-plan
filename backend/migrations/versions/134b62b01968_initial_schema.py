@@ -19,8 +19,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     conn = op.get_bind()
-    inspector = sa.inspect(conn)
-    existing_tables = set(inspector.get_table_names())
+    try:
+        inspector = sa.inspect(conn)
+        existing_tables = set(inspector.get_table_names())
+    except Exception:
+        existing_tables = set()
 
     # --- 1. users ---
     if "users" not in existing_tables:
@@ -30,18 +33,21 @@ def upgrade() -> None:
             sa.Column('email', sa.String(), nullable=True),
             sa.Column('hashed_password', sa.String(), nullable=True),
             sa.Column('display_name', sa.String(), nullable=True),
-            sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')),
+            sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.true()),
             sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
             sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
             sa.PrimaryKeyConstraint('id'),
         )
         op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
     else:
-        existing_cols = {c['name'] for c in inspector.get_columns('users')}
+        try:
+            existing_cols = {c['name'] for c in inspector.get_columns('users')}
+        except Exception:
+            existing_cols = set()
         if 'hashed_password' not in existing_cols:
             op.add_column('users', sa.Column('hashed_password', sa.String(), nullable=True))
         if 'is_active' not in existing_cols:
-            op.add_column('users', sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')))
+            op.add_column('users', sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.true()))
 
     # --- 2. user_preferences ---
     if "user_preferences" not in existing_tables:
@@ -134,7 +140,7 @@ def upgrade() -> None:
             sa.Column('source', sa.String(), nullable=False),
             sa.Column('source_type', sa.String(), nullable=False),
             sa.Column('retrieved_at', sa.DateTime(), nullable=False),
-            sa.Column('is_selected', sa.Boolean(), nullable=False, server_default=sa.text('0')),
+            sa.Column('is_selected', sa.Boolean(), nullable=False, server_default=sa.false()),
             sa.Column('score', sa.Float(), nullable=True),
             sa.Column('decision_factors', sa.JSON(), nullable=True),
             sa.Column('metadata_json', sa.JSON(), nullable=True),
@@ -163,7 +169,7 @@ def upgrade() -> None:
             sa.Column('source_type', sa.String(), nullable=False),
             sa.Column('availability', sa.String(), nullable=False, server_default='unknown'),
             sa.Column('retrieved_at', sa.DateTime(), nullable=False),
-            sa.Column('is_selected', sa.Boolean(), nullable=False, server_default=sa.text('0')),
+            sa.Column('is_selected', sa.Boolean(), nullable=False, server_default=sa.false()),
             sa.Column('metadata_json', sa.JSON(), nullable=True),
             sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
             sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
@@ -185,7 +191,7 @@ def upgrade() -> None:
             sa.Column('estimated_duration_minutes', sa.Integer(), nullable=True),
             sa.Column('estimated_cost', sa.Float(), nullable=True),
             sa.Column('best_time', sa.String(), nullable=True),
-            sa.Column('weather_dependency', sa.Boolean(), nullable=False, server_default=sa.text('0')),
+            sa.Column('weather_dependency', sa.Boolean(), nullable=False, server_default=sa.false()),
             sa.Column('source', sa.String(), nullable=False),
             sa.Column('source_type', sa.String(), nullable=False),
             sa.Column('metadata_json', sa.JSON(), nullable=True),
