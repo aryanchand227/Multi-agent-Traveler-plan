@@ -33,6 +33,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     for issue in prod_issues:
         logger.warning("Production security notice", issue=issue)
 
+    # Fail fast if production is configured with SQLite
+    if settings.is_production and settings.is_sqlite:
+        error_msg = (
+            "FATAL: Production environment detected (APP_ENV=production) with SQLite DATABASE_URL. "
+            "Hosted platforms (such as Render) run on ephemeral containers where SQLite files are lost on restart/redeploy. "
+            "A persistent PostgreSQL database (such as Supabase Free Tier) is required in production. "
+            "Set DATABASE_URL to a valid PostgreSQL connection string or set APP_ENV=development for local testing."
+        )
+        logger.error("Production SQLite rejected", error=error_msg)
+        raise RuntimeError(error_msg)
+
     await init_db()
     logger.info("Database initialized")
     yield

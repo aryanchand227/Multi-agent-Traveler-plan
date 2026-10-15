@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.core.config import get_settings
+from app.db.url import get_async_db_config
 
 _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
@@ -26,27 +27,10 @@ _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 def _create_engine(database_url: str) -> AsyncEngine:
     """Create async engine with appropriate settings for the database type."""
-    is_sqlite = "sqlite" in database_url
-
-    connect_args = {}
-    kwargs: dict = {
-        "echo": False,
-    }
-
-    if is_sqlite:
-        # SQLite needs check_same_thread=False for async
-        connect_args["check_same_thread"] = False
-    else:
-        # PostgreSQL connection pool settings
-        kwargs.update({
-            "pool_size": 20,
-            "max_overflow": 10,
-            "pool_pre_ping": True,
-            "pool_recycle": 3600,
-        })
+    normalized_url, connect_args, kwargs = get_async_db_config(database_url)
 
     return create_async_engine(
-        database_url,
+        normalized_url,
         connect_args=connect_args,
         **kwargs,
     )

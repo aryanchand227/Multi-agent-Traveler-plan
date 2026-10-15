@@ -24,43 +24,46 @@ This guide covers deploying the Multi-Agent AI Travel Planner using **Render** f
          ┌─────────────┴─────────────┐
          ▼                           ▼
 ┌──────────────────┐       ┌──────────────────┐
-│ Render Postgres  │       │     Groq LLM     │
-│ (Users, Plans,   │       │   API Gateway    │
-│  Usage, Memory)  │       │(14 Travel Agents)│
-└──────────────────┘       └──────────────────┘
+│ Supabase Postgres│       │     Groq LLM     │
+│   (Free Tier)    │       │   API Gateway    │
+│ (Users, Plans,   │       │(14 Travel Agents)│
+│  Usage, Memory)  │       └──────────────────┘
+└──────────────────┘
 ```
 
 ---
 
-## 2. Part 1: Deploy Backend & Database on Render
+## 2. Part 1: Provision Supabase PostgreSQL Database (Free)
+
+1. Sign up or log into [Supabase](https://supabase.com).
+2. Create a new project on the **Free** tier.
+3. Once provisioned, click **Connect** in the top navigation bar.
+4. Under the **URI** tab, copy the connection string:
+   - **Pooler (Port 6543, Transaction mode)**: Recommended for cloud web services.
+   - **Direct (Port 5432)**: Direct PostgreSQL connection.
+5. Replace `[YOUR-PASSWORD]` with your actual Supabase database password.
+6. The backend's `app/db/url.py` automatically normalizes `postgresql://` to `postgresql+asyncpg://`, handles SSL, and configures statement caches.
+
+---
+
+## 3. Part 2: Deploy Backend Web Service on Render (Free)
 
 ### Option A: Using the Render Blueprint (Recommended)
 1. Push your repository to GitHub.
 2. In the [Render Dashboard](https://dashboard.render.com), click **New +** -> **Blueprint**.
 3. Connect your repository and select `render.yaml`.
-4. Render will automatically provision:
-   - A managed PostgreSQL instance (`travel-planner-db`).
-   - A Python Web Service (`travel-planner-api`) running FastAPI on Uvicorn.
-5. In the Web Service settings under **Environment**, set the secret values:
+4. Render detects the web service configured on the **Free** plan.
+5. In the settings, provide:
+   - `DATABASE_URL`: Your Supabase connection string.
    - `LLM_API_KEY`: Your real Groq API key (`gsk_...`).
-   - `CORS_ORIGINS`: `["https://your-frontend.vercel.app"]` (update once frontend is created).
+   - `CORS_ORIGINS`: `["http://localhost:3000"]` (update once frontend is created).
 6. Click **Apply**.
 
 ---
 
 ### Option B: Manual Configuration
 
-#### Step 1: Create Managed PostgreSQL
-1. In Render Dashboard, click **New +** -> **PostgreSQL**.
-2. **Name**: `travel-planner-db`
-3. **Database**: `travel_planner`
-4. **User**: `travel_user`
-5. **Region**: Oregon (or your nearest region)
-6. **Plan**: Free or Starter
-7. Once created, copy the **Internal Database URL** (e.g. `postgresql://travel_user:...@dpg-...-a/travel_planner`).
-   *Note: For SQLAlchemy with asyncpg, replace `postgresql://` with `postgresql+asyncpg://`.*
-
-#### Step 2: Create Web Service
+#### Step 1: Create Web Service
 1. In Render Dashboard, click **New +** -> **Web Service**.
 2. Connect your GitHub repository.
 3. Configure the service:

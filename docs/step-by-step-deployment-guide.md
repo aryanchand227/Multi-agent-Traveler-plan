@@ -88,55 +88,64 @@ git push -u origin main
 
 ---
 
-## Step 2: Create a Render Account & Deploy Backend + Database
+## Step 2: Create a Free PostgreSQL Database on Supabase
 
-Render will host your **FastAPI Python server** and your **PostgreSQL database**.
+Render no longer provides permanent free PostgreSQL databases, whereas **Supabase** provides a perpetual Free Tier with 500MB storage, automatic backups, and high-performance connection pooling.
 
-### 2.1 Create an Account on Render
-1. Go to [render.com](https://render.com).
-2. Click **Get Started** or **Sign In**.
-3. **Important**: Choose **Sign in with GitHub**. This allows Render to access your GitHub repositories with one click.
-
----
-
-### 2.2 Create the PostgreSQL Database
-1. In the Render Dashboard, click the blue **New +** button in the top right.
-2. Select **PostgreSQL**.
-3. Fill in the fields:
+### 2.1 Create Your Supabase Account & Project
+1. Go to [supabase.com](https://supabase.com) and click **Start your project** (sign in with GitHub).
+2. Click **New Project**.
+3. Choose your organization, then fill in:
    - **Name**: `travel-planner-db`
-   - **Database**: `travel_planner`
-   - **User**: `travel_user`
-   - **Region**: Choose the region closest to you (e.g., `Oregon (US West)` or `Frankfurt (EU)`)
-   - **PostgreSQL Version**: `16`
-   - **Plan**: Select **Free** (or Starter $7/mo)
-4. Click **Create Database**.
-5. Render will take ~1 minute to create your database.
-6. Once it displays **Available**, scroll down to the **Connections** section:
-   - Find **Internal Database URL** (e.g. `postgres://travel_user:xxxx@dpg-xxxx-a/travel_planner`)
-   - Click the copy button next to it.
-   - Save this URL in a notepad!
+   - **Database Password**: Choose a strong password and save it somewhere secure!
+   - **Region**: Choose the region closest to your users (e.g. `US East (North Virginia)` or `EU (Frankfurt)`).
+   - **Pricing Plan**: **Free** ($0/month).
+4. Click **Create new project** and wait ~2 minutes for it to provision.
 
-> ⚠️ **CRITICAL SQLALCHEMY RULE**:
-> Render gives you a URL starting with `postgres://` or `postgresql://`.
-> Our async backend requires the `asyncpg` driver!
-> You **MUST** change the beginning from `postgres://` (or `postgresql://`) to:
-> `postgresql+asyncpg://`
-> 
-> *Example:*
-> `postgresql+asyncpg://travel_user:password123@dpg-cxxxx-a/travel_planner`
+### 2.2 Obtain Your Database Connection String
+1. In your Supabase dashboard, click the **Connect** button at the top header (or navigate to **Project Settings** -> **Database**).
+2. Under **Connection string**, select the **URI** tab.
+3. You have two options:
+   - **Option A (Connection Pooler - Port 6543, Recommended for Cloud Web Services)**:
+     Select **Mode: Transaction** (or Session).
+     The URL looks like:
+     `postgresql://postgres.[YOUR-PROJECT-REF]:[YOUR-PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres`
+   - **Option B (Direct Connection - Port 5432)**:
+     The URL looks like:
+     `postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres`
+4. Replace `[YOUR-PASSWORD]` with the actual database password you chose in step 2.1.
+5. Copy this URL.
+
+> 💡 **Automatic Async Driver Normalization**:
+> You can paste the URL directly as `postgresql://...` or `postgres://...`!
+> The backend's `app/db/url.py` automatically normalizes it to `postgresql+asyncpg://`, handles SSL (`ssl=require`), and configures the statement cache for port 6543.
 
 ---
 
-### 2.3 Create the FastAPI Web Service
-1. In the Render Dashboard, click the blue **New +** button in the top right.
-2. Select **Web Service**.
-3. Choose **Build and deploy from a Git repository** -> click **Next**.
-4. Select your `ai-travel-agent` repository from the list (click **Connect**).
-5. Configure the service settings:
+## Step 3: Deploy Backend on Render (Free Web Service)
+
+Render will host your **FastAPI Python server** for $0/month.
+
+### 3.1 Create an Account on Render
+1. Go to [render.com](https://render.com).
+2. Sign in with your GitHub account.
+
+### 3.2 Deploy with Render Blueprint (Easiest) or Web Service
+#### Option A: Using the Blueprint (1-Click)
+1. In the Render Dashboard, click **New +** -> **Blueprint**.
+2. Connect your `aryanchand227/Multi-agent-Traveler-plan` repository.
+3. Render detects `render.yaml` configured on the **Free** plan.
+4. Input your `DATABASE_URL` (from Supabase) and `LLM_API_KEY` (from Groq).
+5. Click **Apply**.
+
+#### Option B: Manual Web Service Setup
+1. In Render Dashboard, click **New +** -> **Web Service**.
+2. Connect `aryanchand227/Multi-agent-Traveler-plan`.
+3. Configure settings:
    - **Name**: `travel-planner-api`
-   - **Region**: Choose the **same region** you chose for your database!
+   - **Region**: Choose the same region or nearest to your Supabase database.
    - **Branch**: `main`
-   - **Root Directory**: `backend` *(CRITICAL: type `backend` so Render only runs the Python app)*
+   - **Root Directory**: `backend` *(CRITICAL: type `backend`)*
    - **Runtime**: `Python`
    - **Build Command**:
      ```bash
@@ -146,18 +155,21 @@ Render will host your **FastAPI Python server** and your **PostgreSQL database**
      ```bash
      uvicorn app.main:app --host 0.0.0.0 --port $PORT
      ```
-   - **Plan**: Select **Free** (or Starter $7/mo)
-
-6. Scroll down to **Environment Variables** and click **Add Environment Variable** for each:
-
-| Key | Value | Notes |
-|---|---|---|
-| `APP_ENV` | `production` | Enforces production security checks |
-| `DEBUG` | `false` | Hides internal tracebacks |
-| `PYTHON_VERSION` | `3.11.9` | Reliable Python version |
-| `DATABASE_URL` | *(paste your internal database URL with `postgresql+asyncpg://`)* | Copied from Step 2.2 |
-| `JWT_SECRET_KEY` | *(generate any random 32+ character string)* | e.g. `a8f3b2c9e1d4f7a0b5c8e2d1f4a7b0c3` |
-| `TRUST_ALL_PROXIES` | `true` | Allows Render's reverse proxy to pass IP addresses safely |
+   - **Plan**: Select **Free** ($0/month)
+4. Add the **Environment Variables**:
+   - `APP_ENV`: `production`
+   - `DEBUG`: `false`
+   - `PYTHON_VERSION`: `3.11.9`
+   - `DATABASE_URL`: *(paste your Supabase connection string)*
+   - `JWT_SECRET_KEY`: *(generate a random 32+ character key, e.g. run `python -c "import secrets; print(secrets.token_hex(32))"`)*
+   - `TRUST_ALL_PROXIES`: `true`
+   - `LLM_PROVIDER`: `groq`
+   - `LLM_MODEL`: `openai/gpt-oss-120b`
+   - `LLM_BASE_URL`: `https://api.groq.com/openai/v1`
+   - `LLM_API_KEY`: *(paste your Groq API key, e.g. `gsk_...`)*
+   - `CORS_ORIGINS`: `["http://localhost:3000"]` *(update to your Vercel URL once frontend is created)*
+5. Click **Deploy Web Service**.
+6. When the build runs, `alembic upgrade head` will automatically create all 13 tables on your Supabase PostgreSQL database!
 | `LLM_PROVIDER` | `groq` | Specifies Groq as the AI provider |
 | `LLM_MODEL` | `openai/gpt-oss-120b` | Working Groq model identifier |
 | `LLM_BASE_URL` | `https://api.groq.com/openai/v1` | Groq endpoint |
