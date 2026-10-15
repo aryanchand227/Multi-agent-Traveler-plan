@@ -95,9 +95,9 @@ def get_async_db_config(raw_url: str) -> tuple[str, dict[str, Any], dict[str, An
             connect_args["ssl"] = "require"
 
         # Supabase transaction pooler runs on port 6543 (PgBouncer in transaction mode).
-        # Transaction mode does not support prepared statements; statement cache must be disabled.
+        # Transaction mode does not support prepared statements; statement cache must be disabled
+        # in the asyncpg driver via connect_args (not as an argument to create_async_engine).
         if port == 6543 or "pooler" in hostname:
             connect_args["statement_cache_size"] = 0
-            engine_kwargs["prepared_statement_cache_size"] = 0
 
     return normalized_url, connect_args, engine_kwargs

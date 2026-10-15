@@ -28,6 +28,8 @@ _session_factory: async_sessionmaker[AsyncSession] | None = None
 def _create_engine(database_url: str) -> AsyncEngine:
     """Create async engine with appropriate settings for the database type."""
     normalized_url, connect_args, kwargs = get_async_db_config(database_url)
+    # Ensure invalid driver-level arguments never reach create_async_engine
+    kwargs.pop("prepared_statement_cache_size", None)
 
     return create_async_engine(
         normalized_url,

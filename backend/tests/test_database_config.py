@@ -59,11 +59,52 @@ def test_supabase_pooler_port_6543_statement_cache_disabled():
 
     assert normalized.startswith("postgresql+asyncpg://")
     assert connect_args.get("statement_cache_size") == 0
-    assert engine_kwargs.get("prepared_statement_cache_size") == 0
+    # Must NOT include prepared_statement_cache_size in engine_kwargs (it causes TypeError in create_engine)
+    assert "prepared_statement_cache_size" not in engine_kwargs
     assert connect_args.get("ssl") == "require"
 
 
+def test_supabase_pooler_engine_creation_succeeds_without_type_error():
+    """Regression test: create_async_engine must not raise TypeError with prepared_statement_cache_size."""
+    from app.db.session import _create_engine
+    raw = "postgresql://postgres.ref:secret@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+
+    # Must create engine successfully without raising:
+    # TypeError: Invalid argument(s) 'prepared_statement_cache_size' sent to create_engine()
+    engine = _create_engine(raw)
+    assert engine is not None
+
+
+def test_create_async_engine_receives_exact_valid_arguments_for_pooler():
+    """Assert the exact arguments and connect_args passed to create_async_engine."""
+    from app.db.session import _create_engine
+    raw = "postgresql://postgres.ref:secret@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+
+    with patch("app.db.session.create_async_engine") as mock_create_engine:
+        _create_engine(raw)
+        mock_create_engine.assert_called_once()
+        args, kwargs = mock_create_engine.call_args
+
+        # URL should be normalized to postgresql+asyncpg
+        assert args[0] == "postgresql+asyncpg://postgres.ref:secret@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+
+        # connect_args must have asyncpg-specific statement_cache_size=0 and ssl='require'
+        assert kwargs["connect_args"] == {
+            "ssl": "require",
+            "statement_cache_size": 0,
+        }
+
+        # SQLAlchemy engine kwargs must NOT contain prepared_statement_cache_size
+        assert "prepared_statement_cache_size" not in kwargs
+        assert kwargs["echo"] is False
+        assert kwargs["pool_size"] == 20
+        assert kwargs["max_overflow"] == 10
+        assert kwargs["pool_pre_ping"] is True
+        assert kwargs["pool_recycle"] == 3600
+
+
 def test_supabase_direct_port_5432_config():
+    from app.db.session import _create_engine
     raw = "postgresql://postgres:secret@db.myref.supabase.co:5432/postgres"
     normalized, connect_args, engine_kwargs = get_async_db_config(raw)
 
@@ -71,7 +112,12 @@ def test_supabase_direct_port_5432_config():
     assert connect_args.get("ssl") == "require"
     # Port 5432 is a direct PostgreSQL connection, statement cache not forcibly disabled
     assert "statement_cache_size" not in connect_args
+    assert "prepared_statement_cache_size" not in engine_kwargs
     assert engine_kwargs.get("pool_pre_ping") is True
+
+    # Engine creation succeeds without error
+    engine = _create_engine(raw)
+    assert engine is not None
 
 
 # --- 2. Production SQLite Rejection & Development Compatibility ---
