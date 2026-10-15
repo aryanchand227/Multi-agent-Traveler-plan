@@ -143,3 +143,93 @@ async def test_auth_rate_limiting(client: AsyncClient):
     )
     assert throttled.status_code == 429
     assert "Retry-After" in throttled.headers
+
+
+# --- CORS Configuration & Preflight Regression Tests ---
+
+PROD_ORIGIN = "https://multi-agent-traveler-plan.vercel.app"
+
+
+@pytest.mark.asyncio
+async def test_cors_preflight_production_origin_travel_plan(client: AsyncClient):
+    """OPTIONS preflight request to /api/v1/travel/plan from production origin must return 200 with CORS headers."""
+    response = await client.options(
+        "/api/v1/travel/plan",
+        headers={
+            "Origin": PROD_ORIGIN,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type, authorization",
+        },
+    )
+    assert response.status_code == 200
+    headers = response.headers
+    assert headers.get("access-control-allow-origin") == PROD_ORIGIN
+    assert headers.get("access-control-allow-credentials") == "true"
+    # Never wildcard origin when credentials are enabled
+    assert headers.get("access-control-allow-origin") != "*"
+    allowed_methods = headers.get("access-control-allow-methods", "")
+    assert "POST" in allowed_methods or "*" in allowed_methods
+
+
+@pytest.mark.asyncio
+async def test_cors_simple_request_production_origin(client: AsyncClient):
+    """GET /api/v1/ready with production Origin header must include Access-Control-Allow-Origin."""
+    response = await client.get("/api/v1/ready", headers={"Origin": PROD_ORIGIN})
+    assert response.status_code == 200
+    assert response.headers.get("access-control-allow-origin") == PROD_ORIGIN
+    assert response.headers.get("access-control-allow-credentials") == "true"
+
+
+@pytest.mark.asyncio
+async def test_cors_error_responses_receive_cors_headers(client: AsyncClient):
+    """Error responses (404, 422, 500) must also receive CORS headers so browsers can read the response."""
+    # 404 Not Found
+    r_404 = await client.get("/api/v1/nonexistent", headers={"Origin": PROD_ORIGIN})
+    assert r_404.status_code == 404
+    assert r_404.headers.get("access-control-allow-origin") == PROD_ORIGIN
+
+    # 422 Validation Error
+    r_422 = await client.post("/api/v1/auth/register", json={}, headers={"Origin": PROD_ORIGIN})
+    assert r_422.status_code == 422
+    assert r_422.headers.get("access-control-allow-origin") == PROD_ORIGIN
+
+
+@pytest.mark.asyncio
+async def test_cors_unauthorized_origin_rejected(client: AsyncClient):
+    """Disallowed origins must not receive an Access-Control-Allow-Origin header."""
+    evil_origin = "https://unauthorized-malicious-site.com"
+    response = await client.options(
+        "/api/v1/travel/plan",
+        headers={
+            "Origin": evil_origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    # CORSMiddleware does not grant allow-origin to unauthorized origins
+    assert response.headers.get("access-control-allow-origin") is None
+
+
+def test_cors_origins_parsing_robustness():
+    """Verify that Settings parses various CORS_ORIGINS environment formats without trailing slashes."""
+    from app.core.config import Settings
+
+    # JSON array with trailing slashes
+    s1 = Settings(cors_origins='["https://multi-agent-traveler-plan.vercel.app/", "http://localhost:3000/"]')
+    assert "https://multi-agent-traveler-plan.vercel.app" in s1.cors_origins
+    assert "https://multi-agent-traveler-plan.vercel.app/" not in s1.cors_origins
+    assert "http://localhost:3000" in s1.cors_origins
+
+    # Comma-separated string with spaces and trailing slashes
+    s2 = Settings(cors_origins="https://multi-agent-traveler-plan.vercel.app/ , http://localhost:3000/ ")
+    assert "https://multi-agent-traveler-plan.vercel.app" in s2.cors_origins
+    assert "http://localhost:3000" in s2.cors_origins
+
+    # Single-quoted string array
+    s3 = Settings(cors_origins="['https://multi-agent-traveler-plan.vercel.app/']")
+    assert "https://multi-agent-traveler-plan.vercel.app" in s3.cors_origins
+
+    # Default settings must always include production Vercel frontend
+    s_default = Settings()
+    assert "https://multi-agent-traveler-plan.vercel.app" in s_default.cors_origins
+

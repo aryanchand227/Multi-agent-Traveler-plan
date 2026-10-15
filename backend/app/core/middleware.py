@@ -60,10 +60,21 @@ def get_client_ip(request: Request) -> str:
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Adds standard security headers to all responses."""
+    """Adds standard security headers to all responses and catches unhandled exceptions so error responses return through CORSMiddleware with CORS headers."""
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            logger.error("Unhandled exception in request pipeline: %s", exc, exc_info=True)
+            response = JSONResponse(
+                status_code=500,
+                content={
+                    "error": "InternalServerError",
+                    "message": "An unexpected error occurred.",
+                },
+            )
+
         settings = get_settings()
 
         response.headers["X-Content-Type-Options"] = "nosniff"

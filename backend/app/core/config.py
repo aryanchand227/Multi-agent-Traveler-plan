@@ -64,7 +64,11 @@ class Settings(BaseSettings):
     hotel_api_key: str | None = None
 
     # --- CORS ---
-    cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://multi-agent-traveler-plan.vercel.app",
+    ]
 
     # --- Security & Authentication ---
     jwt_secret_key: str = "dev-insecure-secret-key-change-in-production-min32chars"
@@ -98,11 +102,39 @@ class Settings(BaseSettings):
     @classmethod
     def parse_cors_origins(cls, v: Any) -> list[str]:
         if isinstance(v, str):
-            try:
-                return json.loads(v)
-            except json.JSONDecodeError:
-                return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+            v_trimmed = v.strip()
+            # Handle JSON array format e.g. ["https://..."]
+            if v_trimmed.startswith("[") and v_trimmed.endswith("]"):
+                try:
+                    parsed = json.loads(v_trimmed)
+                except json.JSONDecodeError:
+                    inner = v_trimmed[1:-1].strip()
+                    parsed = [item.strip().strip("'\"") for item in inner.split(",") if item.strip()]
+            else:
+                try:
+                    parsed = json.loads(v_trimmed)
+                    if not isinstance(parsed, list):
+                        parsed = [parsed]
+                except (json.JSONDecodeError, TypeError):
+                    parsed = [origin.strip() for origin in v_trimmed.split(",") if origin.strip()]
+        elif isinstance(v, (list, tuple, set)):
+            parsed = list(v)
+        else:
+            parsed = [str(v)]
+
+        # Normalize origins: strip whitespace, surrounding quotes, and trailing slashes
+        normalized: list[str] = []
+        for origin in parsed:
+            clean = str(origin).strip().strip("'\"").rstrip("/")
+            if clean and clean not in normalized:
+                normalized.append(clean)
+
+        # Guarantee exact production Vercel frontend origin is allowed without trailing slash
+        prod_origin = "https://multi-agent-traveler-plan.vercel.app"
+        if prod_origin not in normalized:
+            normalized.append(prod_origin)
+
+        return normalized
 
     @field_validator("trusted_proxies", mode="before")
     @classmethod

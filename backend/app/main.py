@@ -61,11 +61,12 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Security Headers and Body Size Limit
+    # Security Headers and Body Size Limit (inner middlewares)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestBodyLimitMiddleware)
 
-    # CORS
+    # CORS (must be outermost middleware so preflight OPTIONS and error responses receive CORS headers)
+    logger.info("Configuring CORS middleware", allowed_origins=settings.cors_origins)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
