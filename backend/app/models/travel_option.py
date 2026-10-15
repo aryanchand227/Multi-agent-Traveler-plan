@@ -25,7 +25,7 @@ class TransportOption(Base, TimestampMixin, UUIDMixin):
     availability: Mapped[str] = mapped_column(String, default="unknown")
     source: Mapped[str] = mapped_column(String)
     source_type: Mapped[str] = mapped_column(String)
-    retrieved_at: Mapped[datetime] = mapped_column(DateTime)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     is_selected: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa.false())
     score: Mapped[float | None] = mapped_column(Float, nullable=True)
     decision_factors: Mapped[dict | None] = mapped_column(JSON, nullable=True)

@@ -13,4 +13,4 @@ class MemoryEntry(Base, TimestampMixin, UUIDMixin):
     memory_type: Mapped[str] = mapped_column(String)
     key: Mapped[str] = mapped_column(String, index=True)
     value: Mapped[dict] = mapped_column(JSON)
-    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

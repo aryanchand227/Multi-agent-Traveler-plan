@@ -20,6 +20,6 @@ class AccommodationOption(Base, TimestampMixin, UUIDMixin):
     source: Mapped[str] = mapped_column(String)
     source_type: Mapped[str] = mapped_column(String)
     availability: Mapped[str] = mapped_column(String, default="unknown")
-    retrieved_at: Mapped[datetime] = mapped_column(DateTime)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     is_selected: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa.false())
     metadata_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)

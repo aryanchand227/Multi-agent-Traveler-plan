@@ -31,8 +31,8 @@ class TravelRun(Base, TimestampMixin, UUIDMixin):
 
     request_id: Mapped[str] = mapped_column(ForeignKey("travel_requests.id"), index=True)
     status: Mapped[str] = mapped_column(String, default="pending")
-    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     final_plan: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     agent_states: Mapped[dict | None] = mapped_column(JSON, nullable=True)

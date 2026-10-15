@@ -72,3 +72,25 @@ Backend logs display:
 2. The application will catch this and emit an error event to the frontend:
    `The AI travel assistant is currently busy. Please retry in a few moments.`
 3. You can configure a fallback model in `LLM_MODEL` (e.g. `llama-3.3-70b-versatile`) if the 120b model encounters temporary regional capacity constraints.
+
+---
+
+## 6. Timestamp Mismatch (`can't subtract offset-naive and offset-aware datetimes`)
+
+### Symptom
+Render logs display:
+`sqlalchemy.dialects.postgresql.asyncpg.Error: can't subtract offset-naive and offset-aware datetimes`
+
+### Root Cause
+The application supplies timezone-aware UTC timestamps (`datetime.datetime.now(datetime.timezone.utc)`), but the PostgreSQL table columns were originally created as `TIMESTAMP WITHOUT TIME ZONE`. The PostgreSQL asyncpg driver strictly disallows mixing offset-aware Python datetimes with offset-naive database columns.
+
+### Fix & Migration Instructions
+1. Alembic migration `d678d6de706f_tz_aware_travel_run_timestamps.py` updates the affected columns (`travel_runs.started_at`, `travel_runs.completed_at`, `transport_options.retrieved_at`, `accommodation_options.retrieved_at`, and `memory_entries.expires_at`) to `TIMESTAMP WITH TIME ZONE` using explicit PostgreSQL expressions (`column AT TIME ZONE 'UTC'`), safely preserving existing data.
+2. **Render Automatic Migration**: `render.yaml` executes `alembic upgrade head` in both `buildCommand` and `startCommand`, ensuring the existing database is migrated before requests execute.
+3. **Manual Migration (if deploying outside render.yaml)**:
+   In the Render shell or locally with your Supabase `DATABASE_URL`:
+   ```bash
+   cd backend
+   alembic upgrade head
+   ```
+
