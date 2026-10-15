@@ -1,0 +1,70 @@
+# ==============================================================================
+# AI Travel Planner - Root .gitignore
+# ==============================================================================
+
+# Environment files and secrets (NEVER commit secrets to git)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+
+# Python
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.cover
+
+# Node.js and Next.js
+node_modules/
+.next/
+out/
+.turbo/
+coverage/
+
+# Local databases & SQLite
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs and temporary files
+*.log
+logs/
+*.tmp
+*.temp
+
+# Operating systems
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Docker local overrides
+docker-compose.override.yml
+
+# Internal agent and audit development artifacts
+phase_*.md
+*audit*.md
+*deployment-audit*.md
+CLAUDE.md
+scratch/
