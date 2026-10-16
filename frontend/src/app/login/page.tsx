@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect") || "/plan";
   const { login } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -26,7 +28,7 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      router.push("/plan");
+      router.push(redirect);
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
@@ -37,6 +39,11 @@ export default function LoginPage() {
       setIsSubmitting(false);
     }
   };
+
+  const registerHref =
+    redirect !== "/plan"
+      ? `/register?redirect=${encodeURIComponent(redirect)}`
+      : "/register";
 
   return (
     <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center p-4">
@@ -95,11 +102,25 @@ export default function LoginPage() {
 
         <div className="mt-6 text-center text-sm text-[var(--muted-foreground)]">
           Don&apos;t have an account?{" "}
-          <Link href="/register" className="text-blue-500 hover:underline font-medium">
+          <Link href={registerHref} className="text-blue-500 hover:underline font-medium">
             Sign up
           </Link>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center p-4">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

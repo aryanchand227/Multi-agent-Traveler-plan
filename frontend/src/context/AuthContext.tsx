@@ -45,6 +45,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Listen for unauthorized 401 events dispatched by API client
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      clearAuthToken();
+      setToken(null);
+      setUser(null);
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("auth:unauthorized", handleUnauthorized);
+      return () => {
+        window.removeEventListener("auth:unauthorized", handleUnauthorized);
+      };
+    }
+  }, []);
+
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
@@ -73,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore
     } finally {
+      clearAuthToken();
       setToken(null);
       setUser(null);
     }

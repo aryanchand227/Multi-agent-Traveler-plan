@@ -45,7 +45,7 @@ async function request<T>(
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : { "X-User-ID": "default-user" }),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...((options.headers as Record<string, string>) || {}),
   };
 
@@ -60,6 +60,15 @@ async function request<T>(
     let msg = error.message || error.detail;
     if (typeof msg === "object" && msg !== null) {
       msg = JSON.stringify(msg);
+    }
+
+    if (response.status === 401) {
+      clearAuthToken();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("auth:unauthorized", { detail: { message: msg } })
+        );
+      }
     }
 
     if (response.status === 429) {
@@ -152,6 +161,10 @@ import type { TravelPlanRequest, TravelRunResponse, ReplanRequest } from "@/type
 export async function createTravelPlan(
   data: TravelPlanRequest
 ): Promise<TravelRunResponse> {
+  const token = getAuthToken();
+  if (!token) {
+    throw new ApiError("Authentication required. Please sign in to generate a travel plan.", 401);
+  }
   return request<TravelRunResponse>("/travel/plan", {
     method: "POST",
     body: JSON.stringify(data),
@@ -203,12 +216,30 @@ export async function getTravelHistory(): Promise<Array<{
 import type { UserPreferences, UserPreferencesUpdate } from "@/types/travel";
 
 export async function getPreferences(): Promise<UserPreferences> {
+  const token = getAuthToken();
+  if (!token) {
+    return {
+      user_id: "anonymous",
+      preferred_transport: "flight",
+      travel_style: "standard",
+      budget_preference: undefined,
+      hotel_preference: "hotel_3star",
+      activity_preferences: [],
+      food_preferences: [],
+      default_currency: "INR",
+      default_output_detail: "standard",
+    };
+  }
   return request<UserPreferences>("/preferences");
 }
 
 export async function updatePreferences(
   data: UserPreferencesUpdate
 ): Promise<UserPreferences> {
+  const token = getAuthToken();
+  if (!token) {
+    throw new ApiError("Authentication required. Please sign in to save your preferences.", 401);
+  }
   return request<UserPreferences>("/preferences", {
     method: "PUT",
     body: JSON.stringify(data),

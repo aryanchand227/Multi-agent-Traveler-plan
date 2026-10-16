@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Optional
+import jwt
 from fastapi import Depends, Request, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,11 +45,40 @@ async def get_current_user(
     """
     Enforces authentication.
     Returns User if valid JWT is provided.
-    In development mode only, allows fallback to development user so tests and local dev work.
+    Raises specific 401 exceptions if token is expired or invalid.
+    In development mode only, allows fallback to development user if no token is sent.
     """
-    user = await get_current_user_optional(request, session)
-    if user:
-        return user
+    token = extract_token_from_request(request)
+    if token:
+        settings = get_settings()
+        try:
+            payload = jwt.decode(
+                token,
+                settings.jwt_secret_key,
+                algorithms=[settings.jwt_algorithm],
+            )
+            if "sub" in payload:
+                user_repo = UserRepository(session)
+                user = await user_repo.get_by_id(payload["sub"])
+                if user and user.is_active:
+                    return user
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User account not found or inactive. Please log in again.",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has expired. Please log in again.",
+                headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="The token has expired"'},
+            )
+        except (jwt.InvalidTokenError, jwt.PyJWTError):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token. Please log in again.",
+                headers={"WWW-Authenticate": 'Bearer error="invalid_token"'},
+            )
 
     settings = get_settings()
 

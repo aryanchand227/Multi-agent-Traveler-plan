@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
 import type { UserPreferencesUpdate } from "@/types/travel";
 
@@ -29,6 +32,8 @@ const FOOD_OPTIONS = [
 ];
 
 export default function PreferencesPage() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { preferences, isLoading, isSaving, error, saveSuccess, savePreferences } =
     usePreferences();
 
@@ -68,6 +73,11 @@ export default function PreferencesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAuthenticated) {
+      router.push("/login?redirect=/preferences");
+      return;
+    }
+
     const updatePayload: UserPreferencesUpdate = {
       preferred_transport: preferredTransport,
       travel_style: travelStyle,
@@ -78,7 +88,14 @@ export default function PreferencesPage() {
       default_currency: defaultCurrency,
       default_output_detail: defaultOutputDetail,
     };
-    await savePreferences(updatePayload);
+
+    try {
+      await savePreferences(updatePayload);
+    } catch (err: any) {
+      if (err?.status === 401) {
+        router.push("/login?redirect=/preferences");
+      }
+    }
   };
 
   if (isLoading) {
@@ -98,6 +115,28 @@ export default function PreferencesPage() {
             Customize your persistent travel profile. The AI Travel Manager recalls these preferences during planning.
           </p>
         </div>
+
+        {!authLoading && !isAuthenticated && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+            <div className="flex items-start sm:items-center gap-3">
+              <span className="text-2xl">ℹ️</span>
+              <div>
+                <p className="font-semibold text-sm">Guest Mode — Showing Default Preferences</p>
+                <p className="text-xs text-blue-700">
+                  Sign in to customize and save your preferences for future AI travel plans.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 self-end sm:self-auto flex-shrink-0">
+              <Link
+                href="/login?redirect=/preferences"
+                className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow-sm transition-colors"
+              >
+                Sign In to Save
+              </Link>
+            </div>
+          </div>
+        )}
 
         {saveSuccess && (
           <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-sm font-medium flex items-center gap-2">

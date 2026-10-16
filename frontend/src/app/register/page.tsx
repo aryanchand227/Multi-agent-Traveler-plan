@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect") || "/plan";
   const { register } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -38,7 +40,7 @@ export default function RegisterPage() {
 
     try {
       await register(email, password, displayName || undefined);
-      router.push("/plan");
+      router.push(redirect);
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
@@ -49,6 +51,11 @@ export default function RegisterPage() {
       setIsSubmitting(false);
     }
   };
+
+  const loginHref =
+    redirect !== "/plan"
+      ? `/login?redirect=${encodeURIComponent(redirect)}`
+      : "/login";
 
   return (
     <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center p-4">
@@ -135,11 +142,25 @@ export default function RegisterPage() {
 
         <div className="mt-6 text-center text-sm text-[var(--muted-foreground)]">
           Already have an account?{" "}
-          <Link href="/login" className="text-blue-500 hover:underline font-medium">
+          <Link href={loginHref} className="text-blue-500 hover:underline font-medium">
             Sign in
           </Link>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center p-4">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+        </div>
+      }
+    >
+      <RegisterForm />
+    </Suspense>
   );
 }

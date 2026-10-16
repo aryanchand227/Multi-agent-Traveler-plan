@@ -233,3 +233,56 @@ def test_cors_origins_parsing_robustness():
     s_default = Settings()
     assert "https://multi-agent-traveler-plan.vercel.app" in s_default.cors_origins
 
+
+
+# --- Authentication & Token Lifecycle Regression Tests ---
+
+
+@pytest.mark.asyncio
+async def test_unauthenticated_request_rejected_in_production(client: AsyncClient, monkeypatch):
+    """Unauthenticated requests to protected endpoints must return 401 in production environment."""
+    monkeypatch.setenv("APP_ENV", "production")
+
+    # GET /preferences without token
+    pref_resp = await client.get("/api/v1/preferences")
+    assert pref_resp.status_code == 401
+    assert "Authentication required" in pref_resp.json()["detail"]
+
+    # POST /travel/plan without token
+    plan_resp = await client.post(
+        "/api/v1/travel/plan",
+        json={"origin": "Delhi", "destination": "Goa", "budget": 15000},
+    )
+    assert plan_resp.status_code == 401
+    assert "Authentication required" in plan_resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_expired_token_rejected(client: AsyncClient):
+    """Expired JWT access token must return 401 with clear expiration message."""
+    import datetime
+    from app.core.security import create_access_token
+
+    # Create a token that expired 10 minutes ago
+    expired_token = create_access_token(
+        data={"sub": "user-123", "email": "expired@example.com"},
+        expires_delta=datetime.timedelta(minutes=-10),
+    )
+
+    resp = await client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {expired_token}"},
+    )
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == "Token has expired. Please log in again."
+
+
+@pytest.mark.asyncio
+async def test_invalid_token_rejected(client: AsyncClient):
+    """Malformed or invalid JWT token must return 401 with clear invalid token message."""
+    resp = await client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": "Bearer invalid.malformed.jwt.token"},
+    )
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == "Invalid authentication token. Please log in again."

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, use } from "react";
+import Link from "next/link";
 import { getTravelPlan } from "@/lib/api";
 import AgentProgress from "@/components/AgentProgress";
 import ResultsDashboard from "@/components/ResultsDashboard";
@@ -47,17 +48,42 @@ export default function ResultsPage({ params }: { params: Promise<{ requestId: s
   }
 
   if (error) {
+    const isAuthError =
+      error.toLowerCase().includes("authentication") ||
+      error.toLowerCase().includes("token") ||
+      error.toLowerCase().includes("unauthorized") ||
+      error.toLowerCase().includes("401");
+
     return (
       <div className="min-h-screen bg-gray-50 py-12 px-4">
         <div className="max-w-3xl mx-auto bg-red-50 p-6 rounded-lg shadow border border-red-200">
-          <h2 className="text-xl font-bold text-red-800 mb-2">Error</h2>
+          <h2 className="text-xl font-bold text-red-800 mb-2">
+            {isAuthError ? "Authentication Required" : "Error"}
+          </h2>
           <p className="text-red-700">{error}</p>
-          <button 
-            onClick={fetchPlan}
-            className="mt-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-          >
-            Retry
-          </button>
+          <div className="mt-4 flex flex-wrap gap-3">
+            {isAuthError ? (
+              <Link
+                href={`/login?redirect=/results/${encodeURIComponent(requestId)}`}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium transition"
+              >
+                Sign In to View Plan
+              </Link>
+            ) : (
+              <button 
+                onClick={fetchPlan}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-medium transition"
+              >
+                Retry
+              </button>
+            )}
+            <Link
+              href="/plan"
+              className="border border-gray-300 bg-white text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm font-medium transition"
+            >
+              Back to Planner
+            </Link>
+          </div>
         </div>
       </div>
     );
