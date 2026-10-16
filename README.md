@@ -1,214 +1,249 @@
-# AI Multi-Agent Travel Planner
+# Multi-Agent AI Travel Planner
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Next.js](https://img.shields.io/badge/Next.js-15-black.svg?style=flat&logo=next.js&logoColor=white)](https://nextjs.org)
-[![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-blue.svg?style=flat)](https://github.com/langchain-ai/langgraph)
-[![Groq](https://img.shields.io/badge/LLM-Groq-orange.svg?style=flat)](https://groq.com)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6.svg?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
+[![Next.js](https://img.shields.io/badge/Frontend-Next.js%2016-black?style=flat-square&logo=next.js)](https://nextjs.org)
+[![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-blue?style=flat-square)](https://github.com/langchain-ai/langgraph)
+[![Groq](https://img.shields.io/badge/Inference-Groq-orange?style=flat-square)](https://groq.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-A full-stack, enterprise-grade **Multi-Agent Travel Planning Platform** orchestrated by **LangGraph**, powered by **Groq** high-throughput LLMs, and built with **FastAPI**, **Next.js 15**, and **PostgreSQL**.
+An end-to-end, multi-agent travel planning platform that transforms natural-language travel prompts into structured, cost-optimized, and mathematically verified itineraries. Coordinated by a central **LangGraph StateGraph**, 14 specialized AI agents handle distinct travel domains - from multi-modal transit comparison and lodging selection to budget audits and real-time execution streaming.
 
 ---
 
 ## Table of Contents
-
-- [Overview](#overview)
-- [Problem Statement & Motivation](#problem-statement--motivation)
-- [Key Features](#key-features)
+- [Project Overview](#project-overview)
+- [Live Demo and Screenshots](#live-demo-and-screenshots)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
 - [System Architecture](#system-architecture)
-- [The 14 Specialized Agents](#the-14-specialized-agents)
-- [Technology Stack](#technology-stack)
-- [Mock Providers vs. Live Data](#mock-providers-vs-live-data)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Environment Configuration](#environment-configuration)
-  - [Local Setup (Windows / Linux / macOS)](#local-setup-windows--linux--macos)
-  - [Docker Compose Quickstart](#docker-compose-quickstart)
-- [Testing](#testing)
-- [API Documentation](#api-documentation)
-- [Production Deployment](#production-deployment)
-- [Security & Cost Guardrails](#security--cost-guardrails)
-- [Current Limitations & Roadmap](#current-limitations--roadmap)
-- [License](#license)
+- [AI Agents and Workflow](#ai-agents-and-workflow)
+- [Project Structure](#project-structure)
+- [Installation and Setup](#installation-and-setup)
+- [API Overview](#api-overview)
+- [Limitations and Future Improvements](#limitations-and-future-improvements)
 
 ---
 
-## Overview
+## Project Overview
 
-Planning an end-to-end trip requires synthesizing dozens of interdependent constraints: travel logistics, multi-modal transport schedules, lodging proximities, seasonal weather risks, daily attraction capacities, and financial limits. 
+Planning an end-to-end trip involves balancing numerous interdependent constraints: multi-modal transit schedules (buses, trains, flights), accommodation proximity, local attractions, seasonal weather advisories, and strict budget caps. 
 
-The **AI Multi-Agent Travel Planner** solves this by decomposing travel planning into a coordinated collective of **14 specialized AI agents**. Guided by a central **LangGraph StateGraph**, each agent possesses dedicated domain expertise, isolated state contexts, and purpose-built tools.
+Standard single-prompt LLM chatbots face severe limitations in travel planning:
+- **Context Drift & Hallucination**: Monolithic prompts lose track of detailed constraints and invent non-existent travel connections or schedules.
+- **Arithmetic Errors**: LLMs struggle with deterministic financial arithmetic, leading to inaccurate budget subtotals.
+- **Lack of Verification**: Chatbot outputs lack programmatic validation against calendar dates, transit buffers, and budget ceilings.
 
----
-
-## Problem Statement & Motivation
-
-Traditional travel planners are either rigid search aggregators or single-prompt LLM chatbots:
-- Aggregators show static lists without context-aware itinerary structuring.
-- Single LLM chatbots suffer from context drift, hallucinated schedules, arithmetic errors on budgets, and lack of deterministic validation.
-
-**Our Multi-Agent Architecture solves this through:**
-1. **Separation of Concerns**: Specialized agents handle distinct domains (bus vs. train vs. flight vs. lodging vs. weather).
-2. **Deterministic Rules + LLM Synthesis**: Calculations (budget subtotals, date spans) are handled by deterministic Python tools, while creative synthesis (recommendations, summaries) is handled by LLMs.
-3. **Formal Verification**: A dedicated `ValidationAgent` programmatically audits itineraries against travel times and budget ceilings before finalizing the output.
+### The Multi-Agent Solution
+This project solves these challenges by decomposing the travel planning pipeline into **14 domain-specific AI agents** orchestrated via **LangGraph**:
+1. **Separation of Concerns**: Each agent operates on an isolated domain (e.g., transit evaluation, lodging, budget calculation, weather analysis) with dedicated context and tools.
+2. **Hybrid Architecture (LLM Synthesis + Deterministic Tools)**: Creative tasks (recommendations, summaries) are handled by LLMs, while quantitative operations (budget subtotals, route scoring, validation audits) are executed by deterministic Python logic.
+3. **Formal Verification**: A dedicated `ValidationAgent` programmatically audits itineraries against travel times, budget ceilings, and logistical conflicts before finalizing the plan.
+4. **Live Observability**: Life-cycle execution events are streamed to the client in real time via Server-Sent Events (SSE).
 
 ---
 
-## Key Features
+## Live Demo and Screenshots
 
-- **Natural Language Trip Intake**: Convert prompts (e.g. *"Plan a 5-day budget trip from Hyderabad to Goa for 2 friends under ₹25,000"*) into structured travel plans.
-- **Interactive Clarification Dialog**: Detects ambiguous constraints and prompts the user before launching expensive workflows.
-- **14 Specialized Collaborative Agents**: Distributed graph orchestration powered by LangGraph.
-- **Multi-Modal Transport Evaluation**: Compares buses, trains, and flights across duration, price, and convenience scores.
-- **Live Agent Execution Progress (SSE)**: Real-time event streaming to the frontend so users watch agents deliberate and produce results.
-- **Production Security & Auth**: Password hashing (passlib), cryptographically signed JWT bearer tokens, and IDOR mitigation.
-- **Cost & Rate Control**: Proxy-aware IP rate limiting, concurrent workflow semaphores, and strict daily/monthly LLM spend caps.
+- **Live Application (Frontend)**: [https://multi-agent-traveler-plan.vercel.app/](https://multi-agent-traveler-plan.vercel.app/)
+- **Backend API**: [https://travel-planner-api-38r5.onrender.com](https://travel-planner-api-38r5.onrender.com/)
+- **Interactive API Documentation (Swagger UI)**: [https://travel-planner-api-38r5.onrender.com/docs](https://travel-planner-api-38r5.onrender.com/docs)
+- **Alternative API Documentation (ReDoc)**: [https://travel-planner-api-38r5.onrender.com/redoc](https://travel-planner-api-38r5.onrender.com/redoc)
+
+> **Screenshots**: No static screenshot assets are currently stored in this repository. Please visit the live deployment link above to experience the interactive UI, real-time agent execution timeline, and plan visualization.
+
+---
+
+## Features
+
+- **Natural Language Trip Intake**: Parses unstructured prompts (e.g., *"Plan a 4-day budget trip from Hyderabad to Goa for 2 friends under INR 30,000"*) into structured entities including origin, destination, dates, budget, travelers, and travel style.
+- **Interactive Clarification Dialog**: Analyzes user constraints for ambiguities (e.g., missing departure city, unspecified dates). Pauses execution and asks targeted clarification questions before initiating expensive workflows.
+- **14 Specialized Collaborative Agents**: Orchestrated in sequential and parallel stages via a typed LangGraph `StateGraph`.
+- **Multi-Modal Transport Evaluation**: Queries and compares buses, trains, and flights across duration, price, and convenience scores tailored to user preferences (`rank_transport_options`).
+- **Real-Time Agent Execution Progress (SSE)**: Streams live lifecycle events (`started`, `completed`, `error`) from the planning service to the frontend using HTML5 Server-Sent Events.
+- **Deterministic Budget & Validation Engine**: Computes exact subtotal breakdowns (transportation, lodging, food, activities) and programmatically flags deficit risks and timing collisions.
+- **User Authentication & Data Isolation**: Secure registration and login powered by bcrypt password hashing, PyJWT tokens, HTTP-only session cookies, and IDOR protection.
+- **Safety & Cost Guardrails**: Enforces sliding-window rate limits, concurrent workflow semaphores (`MAX_CONCURRENT_PLANS_TOTAL`), and daily/monthly LLM budget ceilings (`DAILY_LLM_BUDGET_USD`).
+- **Plan History & Conversational Replanning**: Allows authenticated users to view saved itineraries and submit modifications via natural-language replanning prompts.
+
+---
+
+## Tech Stack
+
+### Backend
+- **Language**: Python 3.11+
+- **Web Framework**: FastAPI (Async REST API, OpenAPI/Swagger docs)
+- **Agent Orchestration**: LangGraph (`StateGraph`) & LangChain
+- **LLM Provider**: Groq (`openai/gpt-oss-120b`, `llama-3.3-70b-versatile` via OpenAI-compatible API) with extensible support for OpenAI (`gpt-4o-mini`) and Google Gemini (`gemini-1.5-pro`)
+- **Database & ORM**: PostgreSQL (Production) / SQLite (Local Development) via SQLAlchemy 2.0 (AsyncIO)
+- **Schema Migrations**: Alembic
+- **Validation**: Pydantic v2 & Pydantic-Settings
+- **Real-Time Streaming**: `sse-starlette` (Server-Sent Events)
+- **Security & Cryptography**: PyJWT (JWT tokens) & bcrypt (password hashing)
+- **Logging**: Structlog (Structured JSON logs in production)
+
+### Frontend
+- **Framework**: Next.js 16 (App Router) & React 19
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS v4
+- **State & Data Fetching**: TanStack React Query v5 & Zod (form schema validation)
+- **Streaming Client**: HTML5 `EventSource` (SSE)
+
+### Infrastructure & Deployment
+- **Frontend Hosting**: Vercel
+- **Backend Hosting**: Render (FastAPI Web Service with `render.yaml` Blueprint)
+- **Production Database**: External PostgreSQL (Supabase / Render)
+- **Containerization**: Docker & Docker Compose
 
 ---
 
 ## System Architecture
 
-```
-User → Next.js 15 Client → FastAPI Gateway (JWT / Rate Limiting)
-                                     │
-                                     ▼
-                          LangGraph StateGraph
-                                     │
-                    ┌────────────────┴────────────────┐
-                    │                                 │
-           [Intake / Clarification]             [TravelManager]
-                                                      │
-         ┌──────────────────┬─────────────────────────┴─────────────────────────┐
-         │                  │                         │                         │
-┌────────────────┐  ┌────────────────┐       ┌─────────────────┐       ┌─────────────────┐
-│ Transport Sup. │  │ Accommodation  │       │   Destination   │       │     Weather     │
-│  ┌───┬───┐     │  │     Agent      │       │      Agent      │       │      Agent      │
-│  │Bus│Trn│Flt│ │  └───────┬────────┘       └────────┬────────┘       └────────┬────────┘
-│  └───┴───┘     │          │                         │                         │
-└────────┬───────┘          │                         │                         │
-         └──────────────────┴─────────────┬───────────┴─────────────────────────┘
-                                          │
-                                          ▼
-                               ┌─────────────────────┐
-                               │     BudgetAgent     │
-                               └──────────┬──────────┘
-                                          │
-                                          ▼
-                               ┌─────────────────────┐
-                               │   ItineraryAgent    │
-                               └──────────┬──────────┘
-                                          │
-                                          ▼
-                               ┌─────────────────────┐
-                               │   ValidationAgent   │
-                               └──────────┬──────────┘
-                                          │
-                                          ▼
-                               ┌─────────────────────┐
-                               │  FinalPlannerAgent  │
-                               └─────────────────────┘
-```
+The following Mermaid diagram illustrates the end-to-end request flow, client-server communication, database persistence, and LangGraph multi-agent orchestration:
 
-For an in-depth breakdown of state definitions, context builders, and graph transitions, see [docs/architecture.md](docs/architecture.md).
+```mermaid
+flowchart TD
+    subgraph Client ["Frontend Layer (Next.js 16 / React 19)"]
+        UI[User Interface / Plan Form]
+        SSE_Client[EventSource SSE Client]
+        Dashboard[Results Dashboard]
+    end
+
+    subgraph Gateway ["API Gateway (FastAPI)"]
+        Auth[Auth Middleware & Rate Limiter]
+        Endpoints[Travel Endpoints /api/v1/travel]
+        Hub[EventService SSE Hub]
+    end
+
+    subgraph Database ["Persistence Layer"]
+        DB[(PostgreSQL / SQLite via SQLAlchemy Async)]
+    end
+
+    subgraph Graph ["LangGraph StateGraph Workflow"]
+        START((START)) --> Intake[IntakeAgent]
+        Intake --> Clarify[ClarificationAgent]
+        Clarify --> Check{Requires Clarification?}
+        
+        Check -- "Yes (Missing Info)" --> Pause[Return Questions & Halt]
+        Check -- "No (Complete)" --> Manager[TravelManager]
+        
+        subgraph TransportSubGraph ["Transport Supervisor & Sub-Agents"]
+            Manager --> TS[TransportSupervisor]
+            TS --> Bus[BusAgent]
+            TS --> Train[TrainAgent]
+            TS --> Flight[FlightAgent]
+            Bus & Train & Flight --> Rank[Rank Transport Options]
+        end
+
+        Rank --> Stay[AccommodationAgent]
+        Stay --> Dest[DestinationAgent]
+        Dest --> Weather[WeatherAgent]
+        Weather --> Budget[BudgetAgent]
+        Budget --> Itin[ItineraryAgent]
+        Itin --> Val[ValidationAgent]
+        Val --> Final[FinalPlannerAgent]
+        Final --> END((END))
+    end
+
+    UI -->|1. POST /api/v1/travel/plan| Auth
+    Auth --> Endpoints
+    Endpoints -->|2. Trigger Workflow| Graph
+    Graph -.->|3. Emit Agent Events| Hub
+    Hub -.->|4. Stream SSE Events| SSE_Client
+    Endpoints -->|5. Persist State & Runs| DB
+    Graph -->|6. Save Final Plan| DB
+    Dashboard -->|7. GET /api/v1/travel/:id| Endpoints
+```
 
 ---
 
-## The 14 Specialized Agents
+## AI Agents and Workflow
 
-| # | Agent Name | File Path | Core Role & Responsibilities |
+The system employs **14 specialized agents** that operate cooperatively on a shared, typed `TravelState`. Each agent fulfills a dedicated role defined in `backend/app/agents/`:
+
+| # | Agent Name | Source File | Core Role & Responsibilities |
 |---|---|---|---|
-| 1 | **IntakeAgent** | `backend/app/agents/intake.py` | Parses freeform user text into structured requirements (dates, origin, destination, budget, group size). |
-| 2 | **ClarificationAgent** | `backend/app/agents/clarification.py` | Detects missing criteria (e.g. unknown dates or unspecified budget) and generates targeted clarifying questions. |
-| 3 | **TravelManager** | `backend/app/agents/manager.py` | Top-level orchestrator that validates prerequisites and schedules transport, lodging, and activity sub-tasks. |
-| 4 | **TransportSupervisor** | `backend/app/agents/transport_supervisor.py` | Manages transport sub-agents, aggregates multi-modal options, and produces a weighted ranking score. |
-| 5 | **BusAgent** | `backend/app/agents/bus_agent.py` | Evaluates intercity bus schedules, operators, sleeper/seater categories, and pricing. |
-| 6 | **TrainAgent** | `backend/app/agents/train_agent.py` | Evaluates train routes, coach classes (1A, 2A, 3A, SL), travel times, and rail schedules. |
-| 7 | **FlightAgent** | `backend/app/agents/flight_agent.py` | Evaluates non-stop and connecting commercial flights, airline carriers, baggage allowances, and airfares. |
-| 8 | **AccommodationAgent** | `backend/app/agents/accommodation_agent.py` | Selects hotels, hostels, and resorts tailored to style (budget, boutique, luxury) and location proximity. |
-| 9 | **DestinationAgent** | `backend/app/agents/destination_agent.py` | Curates points of interest, cultural landmarks, local food, and activities tailored to traveler personas. |
-| 10 | **WeatherAgent** | `backend/app/agents/weather_agent.py` | Fetches target-period forecasts, identifies precipitation or heat risks, and recommends itinerary adjustments. |
-| 11 | **BudgetAgent** | `backend/app/agents/budget_agent.py` | Itemizes expenditures across travel, stay, dining, and activities; flags deficit risks with deterministic math. |
-| 12 | **ItineraryAgent** | `backend/app/agents/itinerary_agent.py` | Builds a chronological day-by-day plan with travel buffers, opening hour awareness, and rest blocks. |
-| 13 | **ValidationAgent** | `backend/app/agents/validation_agent.py` | Programmatically validates the complete plan against time collisions, route impossibilities, and budget limits. |
-| 14 | **FinalPlannerAgent** | `backend/app/agents/final_planner.py` | Synthesizes an executive travel brief, packing tips, and the finalized structured JSON payload. |
+| 1 | **IntakeAgent** | `app/agents/intake.py` | Parses free-text prompts into structured parameters: origin, destination, dates, traveler count, budget, and travel style. |
+| 2 | **ClarificationAgent** | `app/agents/clarification.py` | Detects missing or conflicting constraints (e.g., unspecified departure dates or missing budget) and formulates clarifying questions. |
+| 3 | **TravelManager** | `app/agents/manager.py` | Coordinates overall execution strategy, establishes target segment milestones, and sets budget allocation boundaries. |
+| 4 | **TransportSupervisor** | `app/agents/transport_supervisor.py` | Dispatches modal sub-agents (Bus, Train, Flight), normalizes travel options, and executes deterministic ranking via `rank_transport_options`. |
+| 5 | **BusAgent** | `app/agents/bus.py` | Queries bus providers for intercity routes, seat/sleeper categories, operators, durations, and pricing. |
+| 6 | **TrainAgent** | `app/agents/train.py` | Evaluates railway itineraries, train classes (e.g., 1A, 2A, 3A, SL), timetables, and ticket availability. |
+| 7 | **FlightAgent** | `app/agents/flight.py` | Evaluates air travel options, airlines, nonstop/connecting flights, baggage limits, and airfares. |
+| 8 | **AccommodationAgent** | `app/agents/accommodation.py` | Discovers verified lodging (hotels, hostels, resorts) matching budget tier, traveler count, ratings, and location proximity. |
+| 9 | **DestinationAgent** | `app/agents/destination.py` | Recommends curated attractions, cultural landmarks, and activities tailored to user travel style with operating hours and fees. |
+| 10 | **WeatherAgent** | `app/agents/weather.py` | Analyzes forecast and seasonal climate patterns for the destination; flags weather risks (rain, extreme heat) and recommends packing gear. |
+| 11 | **BudgetAgent** | `app/agents/budget.py` | Computes itemized financial subtotals (transport, lodging, activities, food) with deterministic math and verifies adherence to total budget limits. |
+| 12 | **ItineraryAgent** | `app/agents/itinerary.py` | Synthesizes a day-by-day chronological itinerary with time-slotted activities, transit buffers, and rest blocks. |
+| 13 | **ValidationAgent** | `app/agents/validation.py` | Programmatically audits the draft itinerary for temporal conflicts, geographic feasibility, and budget compliance. |
+| 14 | **FinalPlannerAgent** | `app/agents/final_planner.py` | Synthesizes the executive trip brief, daily schedule, budget summary, emergency tips, and finalized JSON payload. |
+
+### Data Providers: Realistic Mocks vs. Live Integration
+
+> **Transparency Note**: To make this project freely cloneable, runnable, and testable without requiring paid enterprise travel API contracts (such as Amadeus, Sabre, IRCTC, or Skyscanner GDS agreements), the project includes pre-seeded **Mock Data Providers**.
+
+- **Mock Providers**: Included for Indian travel corridors (e.g., Hyderabad <-> Goa, Delhi <-> Mumbai, Bangalore <-> Goa). They simulate realistic transit schedules, hotel pricing distributions, attraction catalogs, and climate norms.
+- **Provider Abstraction**: All agents interact with providers via abstract base classes (`BusProvider`, `TrainProvider`, `FlightProvider`, `AccommodationProvider`, `DestinationProvider`, `WeatherProvider`).
+- **Extensibility**: Integrating a live commercial API requires only implementing the corresponding base class and configuring credentials in `.env`.
 
 ---
 
-## Technology Stack
+## Project Structure
 
-### Backend
-- **Framework**: [FastAPI](https://fastapi.tiangolo.com) (Python 3.11+)
-- **Agent Orchestration**: [LangGraph](https://github.com/langchain-ai/langgraph) & [LangChain](https://www.langchain.com)
-- **Primary LLM Provider**: [Groq](https://groq.com) (`openai/gpt-oss-120b`, `llama-3.3-70b-versatile`)
-- **Database & ORM**: PostgreSQL (Production) / SQLite (Local Dev) with [SQLAlchemy 2.0](https://www.sqlalchemy.org) (Async)
-- **Migrations**: [Alembic](https://alembic.sqlalchemy.org)
-- **Validation**: [Pydantic v2](https://docs.pydantic.dev)
-- **Security**: Python-JOSE (JWT), Passlib (Bcrypt), Proxy-aware rate limiter
-- **Logging**: Structlog (JSON structured logs in production)
-
-### Frontend
-- **Framework**: [Next.js 15](https://nextjs.org) (App Router, React 19)
-- **Language**: [TypeScript](https://www.typescriptlang.org)
-- **Styling**: [Tailwind CSS](https://tailwindcss.com) & [Lucide Icons](https://lucide.dev)
-- **Real-Time Client**: HTML5 Server-Sent Events (`EventSource`)
-- **State & Forms**: React Custom Hooks & Zod schema validation
+```
+ai-travel-agent/
+|-- backend/
+|   |-- app/
+|   |   |-- agents/            # 14 specialized AI agents + context builders
+|   |   |-- api/v1/            # FastAPI endpoints (auth, travel, preferences, events, health)
+|   |   |-- core/              # Config, security (JWT/bcrypt), rate limiting, logging
+|   |   |-- db/                # SQLAlchemy async session, base models, repositories
+|   |   |-- graph/             # LangGraph StateGraph workflow and state definitions
+|   |   |-- models/            # SQLAlchemy database entities (User, TravelRun, etc.)
+|   |   |-- providers/         # LLM (Groq/OpenAI/Gemini) & domain provider interfaces (Mock)
+|   |   |-- schemas/           # Pydantic v2 validation models
+|   |   |-- services/          # Planning service, event hub, transport ranker
+|   |   \-- tools/             # Deterministic tools (budget, maps, transport, weather)
+|   |-- migrations/            # Alembic database migrations
+|   |-- tests/                 # 47 unit & integration tests (auth, db, agents, tools)
+|   |-- pyproject.toml         # Python package metadata and dependencies
+|   |-- requirements.txt       # Production pinned backend requirements
+|   \-- Dockerfile             # Backend container image definition
+|-- frontend/
+|   |-- src/
+|   |   |-- app/               # Next.js 16 App Router pages (login, plan, preferences, results)
+|   |   |-- components/        # React components (PlanForm, AgentProgress, ResultsDashboard)
+|   |   |-- context/           # AuthContext for authentication state
+|   |   |-- hooks/             # Custom hooks (useTravelPlan, usePlanningEvents, usePreferences)
+|   |   |-- lib/               # API client, SSE subscriber, utility functions
+|   |   |-- schemas/           # Zod form validation schemas
+|   |   \-- types/             # TypeScript domain definitions
+|   |-- package.json           # Frontend package configuration (Next.js 16, React 19)
+|   \-- Dockerfile             # Frontend container image definition
+|-- docs/                      # Technical documentation (architecture, deployment, security)
+|-- docker-compose.yml         # Multi-container orchestration (Backend, Frontend, PostgreSQL)
+|-- render.yaml                # Infrastructure-as-Code blueprint for Render deployment
+\-- README.md                  # Project documentation
+```
 
 ---
 
-## Mock Providers vs. Live Data
-
-> **Transparency Note**: To ensure this project can be cloned and run by anyone without requiring expensive enterprise travel API keys (such as Amadeus, Sabre, IRCTC, or Skyscanner GDS contracts), the application includes realistic, pre-seeded **Mock Data Providers**.
-
-- **Mock Providers**: Included for Indian travel routes (e.g. Hyderabad↔Goa, Delhi↔Mumbai, Bangalore↔Goa). They simulate realistic transport schedules, real hotel price distributions, and historical climate norms.
-- **Source Labeling**: Every response item generated by a mock provider is tagged with `source_type: "mock"` in the JSON payload.
-- **Extensibility**: All providers implement standard abstract base classes (`TransportProvider`, `AccommodationProvider`, `WeatherProvider`). Connecting live production APIs requires only implementing the base provider interface and setting the corresponding API keys in your `.env`.
-
----
-
-## Getting Started
+## Installation and Setup
 
 ### Prerequisites
 - **Python**: 3.11 or higher
 - **Node.js**: 20.x or higher
-- **Package Managers**: `pip` (Python) and `npm` (Node)
-- **Groq API Key**: Obtain a free API key at [console.groq.com](https://console.groq.com)
+- **Git**
+- **Groq API Key**: Free tier key from [console.groq.com](https://console.groq.com)
 
 ---
 
-### Environment Configuration
-
-1. **Backend Environment**:
-   ```bash
-   cd backend
-   cp .env.example .env
-   ```
-   Open `backend/.env` and insert your Groq API key:
-   ```env
-   LLM_PROVIDER=groq
-   LLM_MODEL=openai/gpt-oss-120b
-   LLM_BASE_URL=https://api.groq.com/openai/v1
-   LLM_API_KEY=gsk_your_actual_groq_api_key_here
-   ```
-
-2. **Frontend Environment**:
-   ```bash
-   cd ../frontend
-   cp .env.example .env.local
-   ```
-   Confirm `NEXT_PUBLIC_API_URL` points to `http://localhost:8000`.
-
----
-
-### Local Setup (Windows / Linux / macOS)
-
-#### 1. Backend Setup
+### 1. Backend Setup
 
 ```bash
-# Navigate to backend
+# Navigate to backend directory
 cd backend
 
-# Create and activate a virtual environment
+# Create and activate a Python virtual environment
 # On Windows (PowerShell):
 python -m venv .venv
 .venv\Scripts\activate
@@ -217,131 +252,136 @@ python -m venv .venv
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Install dependencies
+# Install dependencies (including development and test packages)
 pip install -e ".[dev]"
+# Or install directly via requirements.txt:
+# pip install -r requirements.txt
 
-# Run database migrations
+# Configure environment variables
+cp .env.example .env
+```
+
+Open `backend/.env` and configure your credentials:
+```env
+APP_ENV=development
+DATABASE_URL=sqlite+aiosqlite:///./travel_planner.db
+JWT_SECRET_KEY=dev-insecure-secret-key-change-in-production-min32chars
+LLM_PROVIDER=groq
+LLM_MODEL=openai/gpt-oss-120b
+LLM_BASE_URL=https://api.groq.com/openai/v1
+LLM_API_KEY=gsk_your_actual_groq_api_key_here
+```
+
+Run database migrations and start the backend:
+```bash
+# Apply Alembic database migrations
 alembic upgrade head
 
-# Start the FastAPI server
+# Start FastAPI development server
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
-Backend will be live at `http://localhost:8000`. Interactive API documentation is available at `http://localhost:8000/docs`.
+Backend API will be running at `http://localhost:8000`. Interactive documentation is available at `http://localhost:8000/docs`.
 
-#### 2. Frontend Setup
+---
+
+### 2. Frontend Setup
 
 In a new terminal window:
 ```bash
-# Navigate to frontend
+# Navigate to frontend directory
 cd frontend
 
-# Install packages
+# Install dependencies
 npm install
 
-# Start Next.js development server
+# Configure environment variables
+cp .env.example .env.local
+```
+
+Ensure `frontend/.env.local` points to your backend instance:
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+Start the Next.js development server:
+```bash
 npm run dev
 ```
 Open your browser to `http://localhost:3000`.
 
 ---
 
-### Docker Compose Quickstart
+### 3. Docker Compose (Optional)
 
-If you prefer to run the entire stack with Docker:
+To spin up the complete stack (PostgreSQL, FastAPI backend, and Next.js frontend) with Docker:
 
 ```bash
-# Start backend, frontend, and PostgreSQL services
+# Build and launch all services
 docker compose up -d --build
 
-# View logs
+# Inspect service logs
 docker compose logs -f
 
-# Stop services
+# Shut down services
 docker compose down
 ```
 
 ---
 
-## Testing
+### 4. Running Tests
 
-The backend includes a comprehensive suite of unit and integration tests verifying authentication, model validation, provider mocks, tools, security rate limits, and LangGraph workflows:
+The test suite validates authentication, security policies, database configuration, LangGraph workflow execution, and deterministic tools:
 
 ```bash
-# Activate virtual environment
+# Run backend pytest suite (47 tests)
 cd backend
-.venv\Scripts\activate  # Windows
-# source .venv/bin/activate  # macOS / Linux
-
-# Run test suite
 python -m pytest tests/ -v
-```
 
-Frontend production build verification:
-```bash
-cd frontend
+# Run frontend build check
+cd ../frontend
 npm run build
 ```
 
 ---
 
-## API Documentation
+## API Overview
 
-FastAPI automatically generates interactive OpenAPI/Swagger documentation.
-Once the backend is running, visit:
-- **Swagger UI**: `http://localhost:8000/docs`
-- **ReDoc**: `http://localhost:8000/redoc`
+The FastAPI backend exposes RESTful endpoints with OpenAPI schema definitions.
 
-### Primary Endpoints
+| Method | Endpoint | Description | Auth Required |
+|---|---|---|:---:|
+| `POST` | `/api/v1/register` | Register a new user account | No |
+| `POST` | `/api/v1/login` | Authenticate user and receive JWT token / HTTP-only cookie | No |
+| `GET` | `/api/v1/me` | Retrieve profile of currently authenticated user | Yes |
+| `POST` | `/api/v1/logout` | Clear user authentication session cookie | No |
+| `GET` | `/api/v1/health` | Service liveness probe, environment mode, and provider status | No |
+| `GET` | `/api/v1/ready` | Readiness probe verifying database connectivity | No |
+| `POST` | `/api/v1/travel/plan` | Initialize a multi-agent travel planning run | Yes |
+| `POST` | `/api/v1/travel/clarify` | Submit answers to agent clarification questions | Yes |
+| `GET` | `/api/v1/travel/history` | List travel planning runs created by the user | Yes |
+| `GET` | `/api/v1/travel/{request_id}` | Retrieve status and generated plan payload for a run | Yes |
+| `POST` | `/api/v1/travel/{request_id}/replan` | Request conversational modifications to an existing plan | Yes |
+| `GET` | `/api/v1/travel/{request_id}/events` | Connect to live Server-Sent Events (SSE) agent timeline | Yes |
+| `GET` | `/api/v1/preferences` | Retrieve user-saved travel style and budget preferences | Yes |
+| `PUT` | `/api/v1/preferences` | Update user travel style and budget preferences | Yes |
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/v1/health` | Service health status, database ping, and environment mode |
-| `POST` | `/api/v1/auth/register` | Create a new user account |
-| `POST` | `/api/v1/auth/login` | Authenticate user and receive JWT access token |
-| `POST` | `/api/v1/travel/plan` | Initialize a new multi-agent travel planning run |
-| `POST` | `/api/v1/travel/clarify` | Submit user answers to clarification questions |
-| `GET` | `/api/v1/travel/{id}` | Retrieve complete travel plan result and status |
-| `GET` | `/api/v1/travel/{id}/events` | Connect to live Server-Sent Events (SSE) agent timeline |
-| `GET` | `/api/v1/preferences` | Retrieve authenticated user travel preferences |
-| `PUT` | `/api/v1/preferences` | Update authenticated user travel preferences |
-| `GET` | `/api/v1/monitoring/health` | Detailed system metrics, token usage, and active semaphores |
-
----
-
-## Production Deployment
-
-This project is configured for cloud deployment:
-- **Backend & Database**: Ready for [Render](https://render.com) using the included Infrastructure-as-Code Blueprint (`render.yaml`).
-- **Frontend**: Ready for [Vercel](https://vercel.com).
-
-For step-by-step production deployment instructions, refer to:
-- [docs/step-by-step-deployment-guide.md](docs/step-by-step-deployment-guide.md)
-- [docs/deployment.md](docs/deployment.md)
+- **Live Interactive Docs**: [https://travel-planner-api-38r5.onrender.com/docs](https://travel-planner-api-38r5.onrender.com/docs)
+- **Local Interactive Docs**: `http://localhost:8000/docs`
 
 ---
 
-## Security & Cost Guardrails
-
-- **Zero-Secret Guarantee**: No API keys, passwords, or credentials are tracked in Git.
-- **JWT Authentication**: User identity is validated via cryptographic signatures.
-- **In-Flight Plan Semaphores**: Limits concurrent long-running agent graphs to prevent server thread exhaustion (`MAX_CONCURRENT_PLANS_TOTAL`).
-- **Budget Ceilings**: Strict spending caps (`DAILY_LLM_BUDGET_USD` and `MONTHLY_LLM_BUDGET_USD`) halt LLM requests if thresholds are breached, preventing surprise cloud bills.
-- **Rate Limiting**: Defends endpoints against spam and denial-of-service attempts.
-
----
-
-## Current Limitations & Roadmap
+## Limitations and Future Improvements
 
 ### Current Limitations
-- External travel APIs (GDS/flight aggregators) are mocked by default for zero-cost demonstration.
-- Real-time airline seat booking and transaction checkout are not supported.
-- Pre-seeded routes focus primarily on major Indian travel corridors.
+- **Simulated Provider Data**: Transit schedules, lodging listings, attractions, and weather forecasts utilize simulated mock datasets rather than live commercial booking engines.
+- **No Transactional Checkout**: Seat reservations, hotel bookings, and payment gateway transactions are not implemented.
+- **Geographic Coverage**: Pre-seeded mock travel data focuses primarily on major Indian travel corridors.
 
 ### Planned Enhancements
-- [ ] Direct IRCTC / Skyscanner / Booking.com API adapter plugins.
-- [ ] Interactive Map routing visualization with Mapbox.
-- [ ] Export itinerary directly to Google Calendar and PDF.
-- [ ] Multi-traveler collaborative planning sessions over WebSockets.
+- **Live GDS & Travel API Adapters**: Implement production provider classes for commercial APIs (e.g., Amadeus, Skyscanner, IRCTC, Booking.com, OpenWeather).
+- **Interactive Route Mapping**: Integrate Mapbox / Leaflet for dynamic geographic visualization of transit paths and daily attraction clusters.
+- **Export Capabilities**: Add one-click export of finalized itineraries to Google Calendar, iCalendar (.ics), and formatted PDF documents.
+- **Collaborative Group Planning**: Support multi-user collaborative planning rooms using WebSockets.
 
 ---
 
